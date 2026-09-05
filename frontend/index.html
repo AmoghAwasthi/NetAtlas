@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NetAtlas — Live Network</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header>
+  <div><h1>NetAtlas</h1><p>Live Network Discovery</p></div>
+  <div id="connectionStatus">Connecting...</div>
+</header>
+
+<main>
+  <section class="cards">
+    <div class="card"><span>Subnet</span><strong id="subnet">Detecting...</strong></div>
+    <div class="card"><span>Online Devices</span><strong id="onlineCount">0</strong></div>
+    <div class="card"><span>Total Known</span><strong id="totalCount">0</strong></div>
+  </section>
+
+  <section class="toolbar">
+    <button id="scanButton">Scan Now</button>
+    <span id="lastUpdate">Waiting for discovery...</span>
+  </section>
+
+  <section class="panel">
+    <h2>Live Devices</h2>
+    <table>
+      <thead><tr><th>Status</th><th>IP</th><th>MAC</th><th>Hostname</th><th>Last Seen</th></tr></thead>
+      <tbody id="deviceTable"></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>Next: Live Topology</h2>
+    <p>These database records will become graph nodes in the NetAtlas topology view.</p>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
