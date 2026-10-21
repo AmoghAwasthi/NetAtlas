@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import Base, engine, get_db
-from .discovery import get_local_subnet
+from .discovery import (get_local_subnet, get_local_network_info)
 from .manager import perform_scan
 from .models import Device, DeviceEvent
 from .schemas import DeviceOut, ScanResult
@@ -22,17 +22,23 @@ async def discovery_loop():
     while True:
         try:
             subnet, devices = await asyncio.to_thread(perform_scan)
+            network_info = await asyncio.to_thread(get_local_network_info)
+
             await manager.broadcast_json({
                 "type": "network_update",
                 "subnet": subnet,
+                "local_ip": network_info["local_ip"],
+                "gateway_ip": network_info["gateway_ip"],
                 "devices": [
-                    DeviceOut.model_validate(d).model_dump(mode="json")
-                    for d in devices
+                    DeviceOut.model_validate(device).model_dump(mode="json")
+                    for device in devices
                 ],
             })
         except Exception as exc:
-            await manager.broadcast_json({"type": "error", "message": str(exc)})
-        await asyncio.sleep(max(1, settings.scan_interval_seconds))
+            await manager.broadcast_json({
+                "type": "error",
+                "message": str(exc)
+            })
 
 @asynccontextmanager
 async def lifespan(app):
@@ -51,9 +57,12 @@ def index():
 @app.get("/api/network")
 def network_info():
     try:
-        return {"subnet": get_local_subnet()}
+        return get_local_network_info()
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc)
+        )
 
 @app.get("/api/devices", response_model=list[DeviceOut])
 def devices(db: Session = Depends(get_db)):
@@ -78,6 +87,7 @@ def events(db: Session = Depends(get_db)):
 async def scan_now():
     try:
         subnet, devices = await asyncio.to_thread(perform_scan)
+        network_info = await asyncio.to_thread(get_local_network_info)
         payload = {
             "type": "network_update",
             "subnet": subnet,
@@ -85,6 +95,8 @@ async def scan_now():
                 DeviceOut.model_validate(d).model_dump(mode="json")
                 for d in devices
             ],
+            "local_ip": network_info["local_ip"],
+            "gateway_ip": network_info["gateway_ip"],
         }
         await manager.broadcast_json(payload)
         return ScanResult(subnet=subnet, devices_found=len(devices), devices=devices)

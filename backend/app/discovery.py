@@ -9,12 +9,34 @@ class DiscoveredDevice:
     mac_address: str | None
     hostname: str | None = None
 
-def get_local_subnet() -> str:
-    # Uses Scapy's route table to identify the source IP.
-    _, source_ip, _ = conf.route.route("0.0.0.0")
+def get_local_network_info() -> dict:
+    _, source_ip, gateway_ip = conf.route.route("0.0.0.0")
+
     if not source_ip or source_ip == "0.0.0.0":
-        raise RuntimeError("Could not determine the local IP address.")
-    return str(ipaddress.ip_network(f"{source_ip}/24", strict=False))
+        raise RuntimeError(
+            "Could not determine the local IP address."
+        )
+
+    subnet = str(
+        ipaddress.ip_network(
+            f"{source_ip}/24",
+            strict=False
+        )
+    )
+
+    return {
+        "local_ip": source_ip,
+        "gateway_ip": (
+            gateway_ip
+            if gateway_ip and gateway_ip != "0.0.0.0"
+            else None
+        ),
+        "subnet": subnet,
+    }
+
+
+def get_local_subnet() -> str:
+    return get_local_network_info()["subnet"]
 
 def resolve_hostname(ip: str) -> str | None:
     try:

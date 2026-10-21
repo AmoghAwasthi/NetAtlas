@@ -33,8 +33,34 @@
   </section>
 
   <section class="panel">
-    <h2>Next: Live Topology</h2>
-    <p>These database records will become graph nodes in the NetAtlas topology view.</p>
+  <h2>Live Network Topology</h2>
+
+  <p class="topology-note">
+    Connections are inferred from local network discovery.
+    They do not necessarily represent physical cables.
+  </p>
+
+  <div class="topology-container">
+    <svg
+      id="topologyGraph"
+      viewBox="0 0 900 520"
+      role="img"
+      aria-label="Live network topology graph">
+    </svg>
+  </div>
+  </section>
+
+  <section class="panel">
+    <h2>Device Details</h2>
+    <div id="deviceDetails">
+      Select a device in the topology to inspect it.
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Live Network Events</h2>
+    <p id="eventMessage">Waiting for network changes...</p>
+    <ul id="eventList"></ul>
   </section>
 </main>
 
