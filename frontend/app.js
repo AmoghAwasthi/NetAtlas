@@ -422,3 +422,337 @@ loadInitialData()
         console.error(error);
         status.textContent = "Initialization failed";
     });
+
+    let currentMode = "LIVE";
+
+async function switchMode(mode) {
+    const liveDashboard = document.getElementById("liveDashboard");
+    const simulationDashboard = document.getElementById("simulationDashboard");
+
+    const liveButton = document.getElementById("liveModeBtn");
+    const simulationButton = document.getElementById("simulationModeBtn");
+
+    const modeStatus = document.getElementById("modeStatus");
+    const headerSubtitle = document.getElementById("headerSubtitle");
+
+    if (
+        !liveDashboard ||
+        !simulationDashboard ||
+        !liveButton ||
+        !simulationButton
+    ) {
+        console.error("Dashboard elements could not be found.");
+        return;
+    }
+
+    if (mode === "SIMULATION") {
+        modeStatus.textContent = "Loading simulation data...";
+
+        try {
+            await loadSimulationDashboard();
+
+            const errorBox = document.getElementById("simulationError");
+
+            // If loading failed, keep the existing mode active.
+            if (errorBox.textContent) {
+                modeStatus.textContent = "Current Mode: LIVE";
+                return;
+            }
+
+            currentMode = "SIMULATION";
+
+            liveDashboard.hidden = true;
+            simulationDashboard.hidden = false;
+
+            liveButton.classList.remove("active");
+            simulationButton.classList.add("active");
+
+            modeStatus.textContent =
+                "Current Mode: SIMULATION | PostgreSQL Connected";
+
+            headerSubtitle.textContent =
+                "Simulated Network Management";
+
+        } catch (error) {
+            console.error("Simulation mode error:", error);
+
+            modeStatus.textContent = "Current Mode: LIVE";
+
+            alert(
+                "Could not load simulation data. " +
+                "Check your PostgreSQL connection and API."
+            );
+        }
+
+        return;
+    }
+
+    // Restore the original live dashboard.
+    currentMode = "LIVE";
+
+    simulationDashboard.hidden = true;
+    liveDashboard.hidden = false;
+
+    simulationButton.classList.remove("active");
+    liveButton.classList.add("active");
+
+    modeStatus.textContent = "Current Mode: LIVE";
+
+    headerSubtitle.textContent = "Live Network Discovery";
+}
+
+
+async function loadSimulationDashboard() {
+    const errorBox = document.getElementById("simulationError");
+    const databaseStatus = document.getElementById("simulationDatabaseStatus");
+    errorBox.textContent = "";
+    databaseStatus.textContent = "Connecting to PostgreSQL...";
+
+    try {
+        const [statusResponse, devicesResponse] = await Promise.all([
+            fetch("/api/simulation/status"),
+            fetch("/api/simulation/devices")
+        ]);
+        if (!statusResponse.ok || !devicesResponse.ok) {
+            throw new Error("Could not retrieve simulation data from the backend.");
+        }
+
+        const statusData = await statusResponse.json();
+        const deviceData = await devicesResponse.json();
+        document.getElementById("simTotalDevices").textContent = statusData.total_devices ?? 0;
+        document.getElementById("simOnlineDevices").textContent = statusData.online_devices ?? 0;
+        document.getElementById("simOfflineDevices").textContent = statusData.offline_devices ?? 0;
+        renderSimulationDevices(deviceData.devices || []);
+        databaseStatus.textContent =
+            `Database: ${statusData.database || "connected"} | Devices loaded: ${(deviceData.devices || []).length}`;
+
+        // Optional dashboard panels load independently, so one endpoint error won't hide device inventory.
+        const panels = [
+            {url: "/api/simulation/metrics", key: "metrics", render: renderSimulationMetrics},
+            {url: "/api/simulation/topology", key: "links", render: renderSimulationTopology},
+            {url: "/api/simulation/scans", key: "scans", render: renderSimulationScans},
+            {url: "/api/simulation/events", key: "events", render: renderSimulationEvents},
+            {url: "/api/simulation/alerts", key: "alerts", render: renderSimulationAlerts},
+            {url: "/api/simulation/services", key: "services", render: renderSimulationServices}
+        ];
+        const panelResults = await Promise.allSettled(panels.map(async panel => {
+            const response = await fetch(panel.url);
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.detail || `${panel.url} returned ${response.status}`);
+            }
+            const data = await response.json();
+            panel.render(data[panel.key] || []);
+            return panel.url;
+        }));
+        const failures = panelResults
+            .map((result, index) => result.status === "rejected"
+                ? `${panels[index].url}: ${result.reason.message}` : null)
+            .filter(Boolean);
+        if (failures.length) {
+            errorBox.textContent = "Some panels could not load: " + failures.join(" | ");
+        }
+    } catch (error) {
+        console.error("Failed to load simulation dashboard:", error);
+        errorBox.textContent = error.message;
+        databaseStatus.textContent = "Could not load data from PostgreSQL.";
+        throw error;
+    }
+}
+
+function displayDate(value) {
+    if (!value) return "—";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
+function fillTableBody(id, rows, columns, emptyMessage) {
+    const tbody = document.getElementById(id);
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows.length) {
+        const tr = document.createElement("tr");
+        const td = document.createElement("td");
+        td.colSpan = columns.length;
+        td.textContent = emptyMessage;
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+    }
+    rows.forEach(rowData => {
+        const tr = document.createElement("tr");
+        columns.forEach(column => {
+            const td = document.createElement("td");
+            const value = typeof column.value === "function"
+                ? column.value(rowData) : rowData[column.value];
+            td.textContent = value === null || value === undefined || value === ""
+                ? "—" : String(value);
+            if (column.status) {
+                const normalized = String(value || "").toUpperCase();
+                if (["UP", "OPEN", "RUNNING", "COMPLETED", "INFO"].includes(normalized)) {
+                    td.classList.add("device-status-up");
+                } else if (["DOWN", "CRITICAL", "WARNING", "FAILED"].includes(normalized)) {
+                    td.classList.add("device-status-down");
+                }
+            }
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+}
+
+function renderSimulationMetrics(rows) {
+    fillTableBody("simulationMetricsBody", rows, [
+        {value: "hostname"}, {value: "metric_name"},
+        {value: r => `${r.metric_value ?? "—"} ${r.unit || ""}`},
+        {value: r => displayDate(r.recorded_at)}
+    ], "No monitoring metrics found.");
+}
+
+function renderSimulationScans(rows) {
+    fillTableBody("simulationScansBody", rows, [
+        {value: "network_name"}, {value: "scan_type"},
+        {value: "status", status: true},
+        {value: r => displayDate(r.started_at)},
+        {value: r => displayDate(r.completed_at)}
+    ], "No scan history found.");
+}
+
+function renderSimulationEvents(rows) {
+    fillTableBody("simulationEventsBody", rows, [
+        {value: "hostname"}, {value: "event_type"},
+        {value: "severity", status: true}, {value: "message"},
+        {value: r => displayDate(r.detected_at)},
+        {value: r => r.resolved_at ? "Resolved" : "Active"}
+    ], "No network events found.");
+}
+
+function renderSimulationAlerts(rows) {
+    fillTableBody("simulationAlertsBody", rows, [
+        {value: "hostname"}, {value: "alert_type"},
+        {value: "severity", status: true}, {value: "status", status: true},
+        {value: "message"}, {value: r => displayDate(r.created_at)}
+    ], "No alerts found.");
+}
+
+function renderSimulationServices(rows) {
+    fillTableBody("simulationServicesBody", rows, [
+        {value: "hostname"}, {value: "service_name"}, {value: "protocol"},
+        {value: "port"}, {value: "state", status: true},
+        {value: r => displayDate(r.last_seen)}
+    ], "No service associations found.");
+}
+
+function renderSimulationTopology(links) {
+    const svg = document.getElementById("simulationTopologyGraph");
+    const status = document.getElementById("simulationTopologyStatus");
+    if (!svg || !status) return;
+    svg.replaceChildren();
+
+    const nodeMap = new Map();
+    links.forEach(link => {
+        nodeMap.set(link.source_device_id, {
+            id: link.source_device_id, name: link.source_hostname,
+            type: link.source_type, ip: link.source_ip
+        });
+        nodeMap.set(link.destination_device_id, {
+            id: link.destination_device_id, name: link.destination_hostname,
+            type: link.destination_type, ip: link.destination_ip
+        });
+    });
+    if (!nodeMap.size) {
+        status.textContent = "No topology links found. Check the topology_link table.";
+        return;
+    }
+
+    const nodes = [...nodeMap.values()];
+    const positions = new Map();
+    const centerX = 450, centerY = 210, radius = Math.min(160, 40 + nodes.length * 13);
+    nodes.forEach((node, index) => {
+        const angle = -Math.PI / 2 + (2 * Math.PI * index / nodes.length);
+        positions.set(node.id, {x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle)});
+    });
+
+    const makeSvg = (tag, attrs, textContent) => {
+        const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+        Object.entries(attrs || {}).forEach(([key, value]) => el.setAttribute(key, value));
+        if (textContent !== undefined) el.textContent = textContent;
+        return el;
+    };
+
+    links.forEach(link => {
+        const a = positions.get(link.source_device_id), b = positions.get(link.destination_device_id);
+        if (!a || !b) return;
+        svg.appendChild(makeSvg("line", {
+            x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+            class: "topology-link " + (String(link.link_status).toUpperCase() === "DOWN" ? "sim-link-down" : "")
+        }));
+    });
+
+    nodes.forEach(node => {
+        const p = positions.get(node.id);
+        const group = makeSvg("g", {class: "topology-node simulation-topology-node", transform: `translate(${p.x},${p.y})`});
+        group.appendChild(makeSvg("circle", {r: 24}));
+        const label = String(node.type || "device").toUpperCase().slice(0, 4);
+        group.appendChild(makeSvg("text", {"text-anchor": "middle", y: 4}, label));
+        group.appendChild(makeSvg("text", {"text-anchor": "middle", y: 39, class: "topology-label"}, node.name || "Unknown"));
+        group.appendChild(makeSvg("text", {"text-anchor": "middle", y: 53, class: "topology-ip"}, node.ip || ""));
+        group.appendChild(makeSvg("title", {}, `${node.name || "Unknown"} (${node.ip || "No IP"})`));
+        svg.appendChild(group);
+    });
+    status.textContent = `${nodes.length} devices connected by ${links.length} recorded topology links.`;
+}
+
+
+function renderSimulationDevices(devices) {
+    const tbody = document.getElementById("simulationDeviceBody");
+
+    tbody.replaceChildren();
+
+    if (!devices.length) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+
+        cell.colSpan = 5;
+        cell.textContent = "No simulated devices found in PostgreSQL.";
+
+        row.appendChild(cell);
+        tbody.appendChild(row);
+
+        return;
+    }
+
+    for (const device of devices) {
+        const row = document.createElement("tr");
+
+        const values = [
+            device.hostname,
+            device.device_type,
+            device.vendor || "Unknown",
+            device.management_ip || "Unassigned",
+            device.status
+        ];
+
+        values.forEach((value, index) => {
+            const cell = document.createElement("td");
+
+            cell.textContent = String(value ?? "Unknown");
+
+            if (index === 4) {
+                const deviceStatus = String(
+                    device.status || ""
+                ).toUpperCase();
+
+                if (deviceStatus === "UP") {
+                    cell.classList.add("device-status-up");
+                } else if (deviceStatus === "DOWN") {
+                    cell.classList.add("device-status-down");
+                }
+            }
+
+            row.appendChild(cell);
+        });
+
+        tbody.appendChild(row);
+    }
+}

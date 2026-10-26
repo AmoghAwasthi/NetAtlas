@@ -98,3 +98,122 @@ th,td{padding:13px 10px;text-align:left;border-bottom:1px solid #ffffff14}th{opa
         min-height: 340px;
     }
 }
+.mode-switch {
+    display: flex;
+    gap: 10px;
+    margin: 16px 0;
+}
+
+.mode-btn {
+    padding: 10px 18px;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    background: #172033;
+    color: #e5e7eb;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.mode-btn:hover {
+    opacity: 0.85;
+}
+
+.mode-btn.active {
+    background: #2563eb;
+    color: white;
+    border-color: #2563eb;
+}
+
+#modeStatus {
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+.simulation-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.summary-card {
+    padding: 20px;
+    border-radius: 12px;
+    background: #172033;
+    border: 1px solid #334155;
+    color: #f8fafc;
+}
+
+.summary-card h3 {
+    margin-top: 0;
+    font-size: 14px;
+    color: #cbd5e1;
+}
+
+.summary-card p {
+    margin-bottom: 0;
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+#simulationDeviceTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#simulationDeviceTable th,
+#simulationDeviceTable td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #334155;
+}
+
+#simulationDeviceTable th {
+    background: #172033;
+    color: #f8fafc;
+}
+
+#simulationDeviceTable td {
+    color: inherit;
+}
+
+.device-status-up {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+.device-status-down {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+#simulationError {
+    color: #dc2626;
+    margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+    .simulation-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+/* Simulation dashboard extensions */
+.muted, .topology-note { color: #a9b8d5; }
+.simulation-topology-node circle { fill: #17294b; stroke: #60a5fa; stroke-width: 2.5; }
+.simulation-topology-node:hover circle { stroke: #ffffff; stroke-width: 4; }
+.sim-link-down { stroke: #ef4444 !important; stroke-dasharray: 7 5; }
+#simulationTopologyGraph { display:block; width:100%; min-width:650px; min-height:360px; }
+#simulationDashboard .panel h2 { margin-top: 0; }
+#simulationDashboard table { min-width: 620px; }
+#simulationDashboard td { overflow-wrap:anywhere; }
+#simulationError { overflow-wrap:anywhere; }
+@media (max-width: 700px) {
+  #simulationDashboard .table-container { overflow-x:auto; }
+  #simulationTopologyGraph { min-width:600px; }
+}

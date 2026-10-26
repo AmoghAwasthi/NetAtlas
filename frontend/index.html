@@ -3,65 +3,253 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NetAtlas — Live Network</title>
+  <title>NetAtlas — Network Management</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
+
 <body>
 <header>
-  <div><h1>NetAtlas</h1><p>Live Network Discovery</p></div>
+  <div>
+    <h1>NetAtlas</h1>
+    <p id="headerSubtitle">Live Network Discovery</p>
+  </div>
   <div id="connectionStatus">Connecting...</div>
 </header>
 
 <main>
-  <section class="cards">
-    <div class="card"><span>Subnet</span><strong id="subnet">Detecting...</strong></div>
-    <div class="card"><span>Online Devices</span><strong id="onlineCount">0</strong></div>
-    <div class="card"><span>Total Known</span><strong id="totalCount">0</strong></div>
+
+  <!-- MODE SWITCH -->
+  <section class="mode-switch">
+    <button
+      type="button"
+      id="liveModeBtn"
+      class="mode-btn active"
+      onclick="switchMode('LIVE')">
+      Live Mode
+    </button>
+
+    <button
+      type="button"
+      id="simulationModeBtn"
+      class="mode-btn"
+      onclick="switchMode('SIMULATION')">
+      Simulation Mode
+    </button>
   </section>
 
-  <section class="toolbar">
-    <button id="scanButton">Scan Now</button>
-    <span id="lastUpdate">Waiting for discovery...</span>
-  </section>
-
-  <section class="panel">
-    <h2>Live Devices</h2>
-    <table>
-      <thead><tr><th>Status</th><th>IP</th><th>MAC</th><th>Hostname</th><th>Last Seen</th></tr></thead>
-      <tbody id="deviceTable"></tbody>
-    </table>
-  </section>
-
-  <section class="panel">
-  <h2>Live Network Topology</h2>
-
-  <p class="topology-note">
-    Connections are inferred from local network discovery.
-    They do not necessarily represent physical cables.
-  </p>
-
-  <div class="topology-container">
-    <svg
-      id="topologyGraph"
-      viewBox="0 0 900 520"
-      role="img"
-      aria-label="Live network topology graph">
-    </svg>
+  <div id="modeStatus" role="status" aria-live="polite">
+    Current Mode: LIVE
   </div>
+
+  <!-- ===================================== -->
+  <!-- LIVE DASHBOARD                        -->
+  <!-- ===================================== -->
+
+  <section id="liveDashboard">
+
+    <section class="cards">
+      <div class="card">
+        <span>Subnet</span>
+        <strong id="subnet">Detecting...</strong>
+      </div>
+
+      <div class="card">
+        <span>Online Devices</span>
+        <strong id="onlineCount">0</strong>
+      </div>
+
+      <div class="card">
+        <span>Total Known</span>
+        <strong id="totalCount">0</strong>
+      </div>
+    </section>
+
+    <section class="toolbar">
+      <button type="button" id="scanButton">Scan Now</button>
+      <span id="lastUpdate">Waiting for discovery...</span>
+    </section>
+
+    <section class="panel">
+      <h2>Live Devices</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>IP</th>
+            <th>MAC</th>
+            <th>Hostname</th>
+            <th>Last Seen</th>
+          </tr>
+        </thead>
+
+        <tbody id="deviceTable"></tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Live Network Topology</h2>
+
+      <p class="topology-note">
+        Connections are inferred from local network discovery.
+        They do not necessarily represent physical cables.
+      </p>
+
+      <div class="topology-container">
+        <svg
+          id="topologyGraph"
+          viewBox="0 0 900 520"
+          role="img"
+          aria-label="Live network topology graph">
+        </svg>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Device Details</h2>
+
+      <div id="deviceDetails">
+        Select a device in the topology to inspect it.
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Live Network Events</h2>
+
+      <p id="eventMessage">
+        Waiting for network changes...
+      </p>
+
+      <ul id="eventList"></ul>
+    </section>
+
   </section>
 
-  <section class="panel">
-    <h2>Device Details</h2>
-    <div id="deviceDetails">
-      Select a device in the topology to inspect it.
-    </div>
+  <!-- ===================================== -->
+  <!-- SIMULATION DASHBOARD                  -->
+  <!-- ===================================== -->
+
+  <section id="simulationDashboard" hidden>
+
+    <h2>PostgreSQL Simulation Dashboard</h2>
+
+    <p>
+      Displaying simulated network data retrieved from PostgreSQL.
+    </p>
+
+    <!-- SUMMARY CARDS -->
+
+    <section class="simulation-summary">
+
+      <div class="summary-card">
+        <h3>Total Devices</h3>
+        <p id="simTotalDevices">0</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Online Devices</h3>
+        <p id="simOnlineDevices">0</p>
+      </div>
+
+      <div class="summary-card">
+        <h3>Offline Devices</h3>
+        <p id="simOfflineDevices">0</p>
+      </div>
+
+    </section>
+
+    <!-- DEVICE INVENTORY -->
+
+    <section class="panel">
+      <h2>Simulated Device Inventory</h2>
+
+      <div class="table-container">
+        <table id="simulationDeviceTable">
+
+          <thead>
+            <tr>
+              <th>Hostname</th>
+              <th>Type</th>
+              <th>Vendor</th>
+              <th>IP Address</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+
+          <tbody id="simulationDeviceBody">
+            <tr>
+              <td colspan="5">No devices loaded.</td>
+            </tr>
+          </tbody>
+
+        </table>
+      </div>
+    </section>
+
+
+    <section class="panel">
+      <h2>Simulated Network Topology</h2>
+      <p class="topology-note">Connections are read from the PostgreSQL topology_link table.</p>
+      <div class="topology-container">
+        <svg id="simulationTopologyGraph" viewBox="0 0 900 440" role="img" aria-label="Simulated network topology"></svg>
+      </div>
+      <p id="simulationTopologyStatus" class="muted">Loading topology...</p>
+    </section>
+
+    <section class="panel">
+      <h2>Monitoring Metrics</h2>
+      <div class="table-container">
+        <table><thead><tr><th>Device</th><th>Metric</th><th>Value</th><th>Recorded At</th></tr></thead>
+        <tbody id="simulationMetricsBody"><tr><td colspan="4">Loading metrics...</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Scan History</h2>
+      <div class="table-container">
+        <table><thead><tr><th>Network</th><th>Type</th><th>Status</th><th>Started</th><th>Completed</th></tr></thead>
+        <tbody id="simulationScansBody"><tr><td colspan="5">Loading scan history...</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Network Events</h2>
+      <div class="table-container">
+        <table><thead><tr><th>Device</th><th>Event</th><th>Severity</th><th>Message</th><th>Detected</th><th>State</th></tr></thead>
+        <tbody id="simulationEventsBody"><tr><td colspan="6">Loading events...</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Alerts</h2>
+      <div class="table-container">
+        <table><thead><tr><th>Device</th><th>Alert</th><th>Severity</th><th>Status</th><th>Message</th><th>Created</th></tr></thead>
+        <tbody id="simulationAlertsBody"><tr><td colspan="6">Loading alerts...</td></tr></tbody></table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Service Monitoring</h2>
+      <div class="table-container">
+        <table><thead><tr><th>Device</th><th>Service</th><th>Protocol</th><th>Port</th><th>State</th><th>Last Seen</th></tr></thead>
+        <tbody id="simulationServicesBody"><tr><td colspan="6">Loading services...</td></tr></tbody></table>
+      </div>
+    </section>
+
+        <!-- SIMULATION ERROR / STATUS -->
+
+    <section class="panel">
+      <h2>Database Status</h2>
+
+      <p id="simulationDatabaseStatus">
+        Waiting for database connection...
+      </p>
+
+      <p id="simulationError" role="alert"></p>
+    </section>
+
   </section>
 
-  <section class="panel">
-    <h2>Live Network Events</h2>
-    <p id="eventMessage">Waiting for network changes...</p>
-    <ul id="eventList"></ul>
-  </section>
 </main>
 
 <script src="/static/app.js"></script>

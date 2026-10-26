@@ -15,6 +15,7 @@ from .manager import perform_scan
 from .models import Device, DeviceEvent
 from .schemas import DeviceOut, ScanResult
 from .ws import manager
+from app.simulation import router as simulation_router
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 
@@ -113,3 +114,5 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
     except Exception:
         manager.disconnect(websocket)
+
+app.include_router(simulation_router)
